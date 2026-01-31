@@ -1,0 +1,7 @@
+{
+  "name": "CMSS School Assistant",
+  "description": "An AI-powered school assistant for CASWA Model Science School (CMSS), Jacobabad, providing text and voice-based guidance for students, parents, and teachers.",
+  "requestFramePermissions": [
+    "microphone"
+  ]
+}
