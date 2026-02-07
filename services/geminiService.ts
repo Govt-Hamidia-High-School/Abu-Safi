@@ -5,11 +5,10 @@ import { SYSTEM_INSTRUCTION } from '../constants';
 export class GeminiService {
   /**
    * Generates a text response using the Gemini chat interface.
-   * Note: We initialize a new GoogleGenAI instance for each call to ensure the latest API key is used.
    */
   async getChatResponse(message: string, history: { role: string; parts: { text: string }[] }[]) {
     try {
-      // Create fresh instance before call as per guidelines
+      // Re-initialize to ensure latest API key is used
       const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
       const chat = ai.chats.create({
         model: 'gemini-3-flash-preview',
@@ -17,22 +16,26 @@ export class GeminiService {
           systemInstruction: SYSTEM_INSTRUCTION,
           temperature: 0.7,
         },
-        // Maintain context history across turns
         history: history as any,
       });
 
       const result = await chat.sendMessage({ message });
-      // Direct access to text property
       return result.text || "I'm sorry, I couldn't process that. Please try again.";
-    } catch (error) {
+    } catch (error: any) {
       console.error("Chat Error:", error);
+      if (error.message?.includes("Requested entity was not found")) {
+        // Trigger key re-selection if possible
+        if (typeof window !== 'undefined' && (window as any).aistudio) {
+          (window as any).aistudio.openSelectKey();
+        }
+        return "I need to reconnect to the CMSS servers. Please re-select the API key when prompted.";
+      }
       return "I'm having trouble connecting to my brain right now. Please check your connection.";
     }
   }
 
   /**
    * Connects to the Live API for real-time audio interaction.
-   * Note: We initialize a new GoogleGenAI instance for each connection.
    */
   async connectVoice(callbacks: {
     onOpen: () => void;
@@ -40,7 +43,6 @@ export class GeminiService {
     onError: (e: ErrorEvent) => void;
     onClose: (e: CloseEvent) => void;
   }) {
-    // Create fresh instance before call as per guidelines
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     return ai.live.connect({
       model: 'gemini-2.5-flash-native-audio-preview-12-2025',
@@ -55,18 +57,13 @@ export class GeminiService {
         speechConfig: {
           voiceConfig: { prebuiltVoiceConfig: { voiceName: 'Kore' } },
         },
-        systemInstruction: SYSTEM_INSTRUCTION + "\nIMPORTANT: Your responses must be extremely short and conversational for voice mode.",
+        systemInstruction: SYSTEM_INSTRUCTION + "\nIMPORTANT: Your responses must be extremely short, conversational, and encouraging for students. Use a teacher-like tone.",
       },
     });
   }
 }
 
 // Audio Utils
-
-/**
- * Decodes a base64 string to a Uint8Array.
- * Follows the manual implementation required by the guidelines.
- */
 export function decodeBase64(base64: string): Uint8Array {
   const binaryString = atob(base64);
   const len = binaryString.length;
@@ -77,10 +74,6 @@ export function decodeBase64(base64: string): Uint8Array {
   return bytes;
 }
 
-/**
- * Decodes raw PCM audio data into an AudioBuffer.
- * Follows the manual implementation required by the guidelines.
- */
 export async function decodeAudioData(
   data: Uint8Array,
   ctx: AudioContext,
@@ -100,10 +93,6 @@ export async function decodeAudioData(
   return buffer;
 }
 
-/**
- * Encodes a Uint8Array to a base64 string.
- * Follows the manual implementation required by the guidelines.
- */
 export function encodeAudio(bytes: Uint8Array): string {
   let binary = '';
   const len = bytes.byteLength;
@@ -113,10 +102,6 @@ export function encodeAudio(bytes: Uint8Array): string {
   return btoa(binary);
 }
 
-/**
- * Creates a PCM blob from a Float32Array of audio samples.
- * Uses correct 32768 scaling as per guidelines.
- */
 export function createPcmBlob(data: Float32Array): Blob {
   const l = data.length;
   const int16 = new Int16Array(l);

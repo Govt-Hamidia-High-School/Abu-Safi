@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { ChatInterface } from './components/ChatInterface';
 import { VoiceInterface } from './components/VoiceInterface';
 import { AppMode, Message } from './types';
@@ -8,7 +8,29 @@ import { SCHOOL_INFO } from './constants';
 const App: React.FC = () => {
   const [mode, setMode] = useState<AppMode>('chat');
   const [messages, setMessages] = useState<Message[]>([]);
-  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [hasKey, setHasKey] = useState<boolean | null>(null);
+
+  // Check for API key on mount
+  useEffect(() => {
+    const checkKey = async () => {
+      if (typeof window !== 'undefined' && (window as any).aistudio) {
+        const isSelected = await (window as any).aistudio.hasSelectedApiKey();
+        setHasKey(isSelected);
+      } else {
+        // Fallback for non-aistudio environments if key is in process.env
+        setHasKey(!!process.env.API_KEY);
+      }
+    };
+    checkKey();
+  }, []);
+
+  const handleConnect = async () => {
+    if (typeof window !== 'undefined' && (window as any).aistudio) {
+      await (window as any).aistudio.openSelectKey();
+      // Assume success as per guidelines to avoid race condition
+      setHasKey(true);
+    }
+  };
 
   const addMessage = useCallback((role: 'user' | 'assistant', content: string) => {
     const newMessage: Message = {
@@ -21,10 +43,52 @@ const App: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    if (messages.length === 0) {
+    if (hasKey && messages.length === 0) {
       addMessage('assistant', `Welcome to ${SCHOOL_INFO.name}, Jacobabad! I am your AI assistant. How can I help you today with admissions, STEM programs, or general school information?`);
     }
-  }, [addMessage, messages.length]);
+  }, [hasKey, addMessage, messages.length]);
+
+  if (hasKey === false) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-screen bg-slate-50 p-6 text-center">
+        <div className="max-w-md w-full bg-white rounded-3xl shadow-2xl p-8 border border-blue-100">
+          <div className="w-20 h-20 bg-blue-900 rounded-full flex items-center justify-center text-white mx-auto mb-6 shadow-lg">
+            <i className="fas fa-microchip text-3xl"></i>
+          </div>
+          <h1 className="text-2xl font-bold text-slate-800 mb-4">{SCHOOL_INFO.alias} AI Hub</h1>
+          <p className="text-slate-600 mb-8 leading-relaxed">
+            Welcome to the AI Assistant for CASWA Model Science School. To access our STEM guidance and school services, please connect your AI credentials.
+          </p>
+          <button
+            onClick={handleConnect}
+            className="w-full py-4 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold transition-all transform hover:scale-105 shadow-xl flex items-center justify-center gap-3"
+          >
+            <i className="fas fa-plug"></i>
+            Connect to School AI
+          </button>
+          <div className="mt-8 pt-6 border-t border-slate-100">
+            <p className="text-xs text-slate-400 mb-2">Required for AI processing</p>
+            <a 
+              href="https://ai.google.dev/gemini-api/docs/billing" 
+              target="_blank" 
+              rel="noopener noreferrer"
+              className="text-blue-500 hover:underline text-xs flex items-center justify-center gap-1"
+            >
+              Learn about AI Billing <i className="fas fa-external-link-alt text-[10px]"></i>
+            </a>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (hasKey === null) {
+    return (
+      <div className="flex items-center justify-center min-h-screen bg-slate-50">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-900"></div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col h-screen bg-slate-50 overflow-hidden">
